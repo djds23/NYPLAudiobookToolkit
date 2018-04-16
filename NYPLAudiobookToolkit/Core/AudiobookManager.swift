@@ -14,14 +14,14 @@ import AVFoundation
 /// If the AudiobookManager runs into an error while fetching
 /// values from the provided Audiobook, it may use this
 /// protocol to request a new Audiobook from the host app.
-@objc public protocol RefreshDelegate {
+@objc public protocol AudiobookManagerDelegate {
 
     /**
      Will be called when the manager determines it needs a new audiobook.
      
      Example usage:
      ```
-     func updateAudiobook(completion: (Audiobook?) -> Void) {
+     func audiobookManagerDidRequestNewManifestWith(completion: (Audiobook?) -> Void) {
      let audiobook = self.getAudiobook()
      completion(audiobook)
      }
@@ -31,7 +31,8 @@ import AVFoundation
         - completion: The block to be called when new audiobook has been obtained.
         - audiobook: The new Audiobook, may be nil if fetch was unsuccessful
      */
-    func updateAudiobook(completion: (_ audiobook: Audiobook?) -> Void)
+    func audiobookManagerDidRequestNewManifestWith(completion: (_ audiobook: Audiobook?) -> Void)
+    
 }
 
 /// Conform to this in order to get notifications about download
@@ -53,7 +54,7 @@ import AVFoundation
 /// This object also manages the remote playback/media info for control
 /// center / airplay.
 @objc public protocol AudiobookManager {
-    weak var refreshDelegate: RefreshDelegate? { get set }
+    weak var delegate: AudiobookManagerDelegate? { get set }
     weak var downloadDelegate: AudiobookManagerDownloadDelegate? { get set }
     weak var timerDelegate: AudiobookManagerTimerDelegate? { get set }
     var metadata: AudiobookMetadata { get }
@@ -70,15 +71,12 @@ public final class DefaultAudiobookManager: AudiobookManager {
     public weak var timerDelegate: AudiobookManagerTimerDelegate?
     private(set) public var timer: Timer?
     public let metadata: AudiobookMetadata
-    public let audiobook: Audiobook
-    public var isPlaying: Bool {
-        return self.player.isPlaying
-    }
-    
+    private(set) public var audiobook: Audiobook
+
     public var tableOfContents: AudiobookTableOfContents {
         return AudiobookTableOfContents(
             networkService: self.networkService,
-            player: self.player
+            player: self.audiobook.player
         )
     }
 
@@ -88,18 +86,16 @@ public final class DefaultAudiobookManager: AudiobookManager {
     /// SleepTimer is thread safe, and will block until it can ensure only one
     /// object is messaging it at a time.
     public lazy var sleepTimer: SleepTimer = {
-        return SleepTimer(player: self.player)
+        return SleepTimer(player: self.audiobook.player)
     }()
     
-    private let player: Player
-    private let networkService: AudiobookNetworkService
+    private var networkService: AudiobookNetworkService
     public init (metadata: AudiobookMetadata, audiobook: Audiobook,  player: Player, networkService: AudiobookNetworkService) {
         self.metadata = metadata
         self.audiobook = audiobook
-        self.player = player
         self.networkService = networkService
         self.networkService.registerDelegate(self)
-        self.player.registerDelegate(self)
+        self.audiobook.player.registerDelegate(self)
         try? AVAudioSession.sharedInstance().setActive(true)
         DispatchQueue.main.async {
             self.timer = Timer.scheduledTimer(
@@ -123,7 +119,7 @@ public final class DefaultAudiobookManager: AudiobookManager {
 
     @objc func timerDidTick1Second(_ timer: Timer) {
         self.timerDelegate?.audiobookManager(self, didUpdate: timer)
-        if let chapter = self.player.currentChapterLocation {
+        if let chapter = self.audiobook.player.currentChapterLocation {
             var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [String: Any]()
             if let title = chapter.title {
                 info[MPMediaItemPropertyTitle] = title
@@ -136,7 +132,7 @@ public final class DefaultAudiobookManager: AudiobookManager {
         }
     }
 
-    weak public var refreshDelegate: RefreshDelegate?
+    weak public var delegate: AudiobookManagerDelegate?
 }
 
 extension DefaultAudiobookManager: PlayerDelegate {
@@ -149,19 +145,19 @@ extension DefaultAudiobookManager: PlayerDelegate {
         command.skipBackwardCommand.preferredIntervals = [15]
         
         command.togglePlayPauseCommand.addTarget { (event) -> MPRemoteCommandHandlerStatus in
-            if self.player.isPlaying {
-                self.player.pause()
+            if self.audiobook.player.isPlaying {
+                self.audiobook.player.pause()
             } else {
-                self.player.play()
+                self.audiobook.player.play()
             }
             return .success
         }
         command.skipForwardCommand.addTarget { (event) -> MPRemoteCommandHandlerStatus in
-            self.player.skipForward()
+            self.audiobook.player.skipForward()
             return .success
         }
         command.skipBackwardCommand.addTarget { (event) -> MPRemoteCommandHandlerStatus in
-            self.player.skipBack()
+            self.audiobook.player.skipBack()
             return .success
         }
     }
