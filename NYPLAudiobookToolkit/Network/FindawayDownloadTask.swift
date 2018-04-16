@@ -244,6 +244,9 @@ extension FindawayDownloadTask: FindawayDownloadNotificationHandlerDelegate {
 }
 
 extension FindawayDownloadTask: AudiobookLifecycleManagerDelegate {
+    func audiobookLifecycleManagerWillTerminate(_ audiobookLifecycleManager: AudiobookLifeCycleManager) { }
+    func audiobookLifecycleManagerDidEnterBackground(_ audiobookLifecycleManager: AudiobookLifeCycleManager) { }
+    
     func audiobookLifecycleManagerDidUpdate(_ audiobookLifecycleManager: AudiobookLifeCycleManager) {
         self.queue.sync {
             self.readyToDownload = audiobookLifecycleManager.audioEngineDatabaseHasBeenVerified

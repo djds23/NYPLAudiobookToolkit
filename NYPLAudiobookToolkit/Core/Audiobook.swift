@@ -20,6 +20,7 @@ private func findawayKey(_ key: String) -> String {
 }
 
 @objc public protocol Audiobook: class {
+    var uniqueIdentifier: String { get }
     var spine: [SpineElement] { get }
     var player: Player { get }
     init?(JSON: Any?)
@@ -52,6 +53,7 @@ private func findawayKey(_ key: String) -> String {
 private final class FindawayAudiobook: Audiobook {
     let player: Player
     let spine: [SpineElement]
+    let uniqueIdentifier: String
     public required init?(JSON: Any?) {
         guard let payload = JSON as? [String: Any] else { return nil }
         guard let metadata = payload["metadata"] as? [String: Any] else { return nil }
@@ -60,7 +62,7 @@ private final class FindawayAudiobook: Audiobook {
         guard let sessionKey = encrypted[findawayKey("sessionKey")] as? String else { return nil }
         guard let audiobookID = encrypted[findawayKey("fulfillmentId")] as? String else { return nil }
         guard let licenseID = encrypted[findawayKey("licenseId")] as? String else { return nil }
-        self.spine = spine.flatMap { (possibleLink) -> SpineElement? in
+        self.spine = spine.compactMap { (possibleLink) -> SpineElement? in
             FindawaySpineElement(
                 JSON: possibleLink,
                 sessionKey: sessionKey,
@@ -71,6 +73,7 @@ private final class FindawayAudiobook: Audiobook {
         guard let firstSpineElement = self.spine.first as? FindawaySpineElement else { return nil }
         guard let cursor = Cursor(data: self.spine) else { return nil }
         self.player = FindawayPlayer(spineElement: firstSpineElement, cursor: cursor)
+        self.uniqueIdentifier = audiobookID
     }
 }
 
@@ -122,16 +125,18 @@ final class FindawaySpineElement: SpineElement {
 private final class OpenAccessAudiobook: Audiobook {
     var spine: [SpineElement]
     let player: Player
+    let uniqueIdentifier: String
     public required init?(JSON: Any?) {
         guard let payload = JSON as? [String: Any] else { return nil }
         guard let spine = payload["spine"] as? [Any] else { return nil }
-        self.spine = spine.flatMap { (possibleLink) -> SpineElement? in
+        self.spine = spine.compactMap { (possibleLink) -> SpineElement? in
             OpenAccessSpineElement(
                 JSON: possibleLink
             )
         }
         guard !self.spine.isEmpty else { return nil }
         self.player = OpenAccessPlayer()
+        self.uniqueIdentifier = "identifier"
     }
 }
 

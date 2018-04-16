@@ -32,6 +32,7 @@ import AVFoundation
         - audiobook: The new Audiobook, may be nil if fetch was unsuccessful
      */
     func audiobookManagerDidRequestNewManifestWith(completion: (_ audiobook: Audiobook?) -> Void)
+    func audiobookManagerDidRequestPlayheadPersisted(location: ChapterLocation, in audiobook: Audiobook)
     
 }
 
@@ -90,12 +91,13 @@ public final class DefaultAudiobookManager: AudiobookManager {
     }()
     
     private var networkService: AudiobookNetworkService
-    public init (metadata: AudiobookMetadata, audiobook: Audiobook,  player: Player, networkService: AudiobookNetworkService) {
+    public init (metadata: AudiobookMetadata, audiobook: Audiobook,  player: Player, networkService: AudiobookNetworkService, lifeCycleManager: AudiobookLifeCycleManager = DefaultAudiobookLifecycleManager.shared) {
         self.metadata = metadata
         self.audiobook = audiobook
         self.networkService = networkService
         self.networkService.registerDelegate(self)
         self.audiobook.player.registerDelegate(self)
+        lifeCycleManager.registerDelegate(self)
         try? AVAudioSession.sharedInstance().setActive(true)
         DispatchQueue.main.async {
             self.timer = Timer.scheduledTimer(
@@ -180,4 +182,19 @@ extension DefaultAudiobookManager: AudiobookNetworkServiceDelegate {
     }
 
     public func audiobookNetworkService(_ audiobookNetworkService: AudiobookNetworkService, didDeleteFileFor spineElement: SpineElement) { }
+}
+
+extension DefaultAudiobookManager: AudiobookLifecycleManagerDelegate {
+    public func audiobookLifecycleManagerDidUpdate(_ audiobookLifecycleManager: AudiobookLifeCycleManager) { }
+    public func audiobookLifecycleManagerWillTerminate(_ audiobookLifecycleManager: AudiobookLifeCycleManager) {
+        if let chapter = self.audiobook.player.currentChapterLocation {
+            self.delegate?.audiobookManagerDidRequestPlayheadPersisted(location: chapter, in: self.audiobook)
+        }
+    }
+    
+    public func audiobookLifecycleManagerDidEnterBackground(_ audiobookLifecycleManager: AudiobookLifeCycleManager) {
+        if let chapter = self.audiobook.player.currentChapterLocation {
+            self.delegate?.audiobookManagerDidRequestPlayheadPersisted(location: chapter, in: self.audiobook)
+        }
+    }
 }

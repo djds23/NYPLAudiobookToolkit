@@ -342,6 +342,10 @@ final class FindawayPlayer: NSObject, Player {
 }
 
 extension FindawayPlayer: AudiobookLifecycleManagerDelegate {
+    func audiobookLifecycleManagerWillTerminate(_ audiobookLifecycleManager: AudiobookLifeCycleManager) { }
+    
+    func audiobookLifecycleManagerDidEnterBackground(_ audiobookLifecycleManager: AudiobookLifeCycleManager) { }
+    
     func audiobookLifecycleManagerDidUpdate(_ audiobookLifecycleManager: AudiobookLifeCycleManager) {
         func handleLifecycleManagerUpdate(hasBeenVerified: Bool) {
             self.readyForPlayback = hasBeenVerified
